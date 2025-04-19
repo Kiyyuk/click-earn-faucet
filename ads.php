@@ -1,49 +1,51 @@
 <?php
 session_start();
-require 'config.php';
+require '../config.php';
 
-$user_id = $_SESSION['user_id'];
-
-// Check if the user has watched all ads for today
-$check_today = $conn->prepare("SELECT COUNT(*) FROM ad_clicks WHERE user_id = ? AND DATE(clicked_at) = CURDATE()");
-$check_today->bind_param("i", $user_id);
-$check_today->execute();
-$click_count = $check_today->get_result()->fetch_row()[0];
-
-if ($click_count >= 1) { // Limit to 1 ad per day
-    echo "<p>All ads watched! Try again tomorrow.</p>";
+// Check if admin is logged in
+if (!isset($_SESSION['admin_logged_in'])) {
+    header("Location: login.php");
     exit();
 }
 
-// Fetch a random active ad
-$result = $conn->query("SELECT * FROM ads WHERE status = 'active' ORDER BY RAND() LIMIT 1");
-$ad = $result->fetch_assoc();
-
-if ($ad) {
-    echo "<div id='ad-section'>";
-    echo "<iframe src='" . $ad['adcode'] . "' width='100%' height='400'></iframe>";
-    echo "<p>Stay on this page for <span id='timer'>20</span> seconds to earn points.</p>";
-    echo "<form id='claim-form' method='POST' action='claim.php' style='display:none;'>
-            <input type='hidden' name='ad_id' value='" . $ad['id'] . "'>
-            <div class='g-recaptcha' data-sitekey='YOUR_RECAPTCHA_SITE_KEY'></div>
-            <button type='submit'>Claim Points</button>
-          </form>";
-    echo "</div>";
-} else {
-    echo "<p>No ads available.</p>";
-}
+// Fetch ads
+$result = $conn->query("SELECT * FROM ads");
 ?>
 
-<script>
-let timeLeft = 20;
-const timerElement = document.getElementById("timer");
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Ads - Click & Earn</title>
+</head>
+<body>
+    <h1>Manage Ads</h1>
+    <a href="index.php">Back to Dashboard</a>
 
-const timerInterval = setInterval(() => {
-    timeLeft--;
-    timerElement.textContent = timeLeft;
-    if (timeLeft === 0) {
-        clearInterval(timerInterval);
-        document.getElementById("claim-form").style.display = "block";
-    }
-}, 1000);
-</script>
+    <h2>Add New Ad</h2>
+    <form method="POST" action="add_ad.php">
+        Ad Code: <textarea name="adcode" required></textarea><br>
+        Country (optional): <input type="text" name="country"><br>
+        <button type="submit">Add Ad</button>
+    </form>
+
+    <h2>Existing Ads</h2>
+    <table border="1">
+        <tr>
+            <th>ID</th>
+            <th>Ad Code</th>
+            <th>Country</th>
+            <th>Actions</th>
+        </tr>
+        <?php while ($row = $result->fetch_assoc()) { ?>
+            <tr>
+                <td><?= $row['id'] ?></td>
+                <td><?= htmlspecialchars($row['adcode']) ?></td>
+                <td><?= $row['country'] ?? 'All' ?></td>
+                <td>
+                    <a href="delete_ad.php?id=<?= $row['id'] ?>">Delete</a>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+</body>
+</html>
